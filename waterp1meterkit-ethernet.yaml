@@ -1,17 +1,13 @@
----
 #Name of device
 substitutions:
   device_name: waterp1meterkit
+  devicename: waterp1meterkit
   friendly_name: WaterP1MeterKit
-  waterp1meterkit_software_version: "1.1"
 
 #Esphome start
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
-  project:
-    name: "smarthomeshop.waterp1meterkit"
-    version: ${waterp1meterkit_software_version}
 
 esp32:
   board: esp32dev
@@ -22,12 +18,46 @@ esp32:
 logger:
   baud_rate: 115200
 
+# Enable Home Assistant API
+api:
+  reboot_timeout: 0s
+  encryption:
+    key: !secret api_encryption_key
+
 #Enable Over the Air updates
 ota:
-  - platform: esphome
+  platform: esphome
+  password: !secret ota_password
 
-dashboard_import:
-  package_import_url: github://smarthomeshop/waterp1meterkit/waterp1meterkit-ethernet.yaml@main
+safe_mode:
+  disabled: false
+  reboot_timeout: 10min
+  num_attempts: 5
+
+# Webserver configuration
+web_server:
+  port: 80
+  version: 2
+  include_internal: false
+  auth:
+    username: !secret web_server_user
+    password: !secret web_server_password
+  local: true
+
+# MQtt
+#mqtt:
+#  broker: !secret mqtt_ip
+#  username: !secret mqtt_user_esp
+#  password: !secret mqtt_password_esp
+#  client_id: $devicename
+
+# Time settings
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+#dashboard_import:
+#  package_import_url: github://smarthomeshop/waterp1meterkit/waterp1meterkit-ethernet.yaml@main
 
 ethernet:
   type: LAN8720
@@ -36,9 +66,6 @@ ethernet:
   clk_mode: GPIO17_OUT
   phy_addr: 1
   power_pin: GPIO16
-
-web_server:
-  port: 80
 
 # Switch to restart the waterp1meter
 switch:
@@ -170,42 +197,38 @@ sensor:
       name: "Gas Consumed"
       state_class: total_increasing
 
-    # Belgium
-    # gas_delivered_be:
-    #   name: ${friendly_name} Gas Delivered BE
-
-    # Luxembourg
-    # energy_delivered_lux:
-    #   name: ${friendly_name} Energy Delivered Lux
-    # energy_returned_lux:
-    #   name: ${friendly_name} Energy Returned Lux
-
   #WaterMeter sensor part
   - platform: pulse_meter
     id: sensor_pulse_meter
-    name: "${friendly_name} Current Usage"
+    name: "Water Current Usage"
     icon: "mdi:water-pump"
-    unit_of_measurement: "L/min"
+    unit_of_measurement: "L"
     internal_filter_mode: PULSE
     internal_filter: 200ms
     timeout: 2min
-    accuracy_decimals: 1
+    accuracy_decimals: 0
+    
     total:
       id: sensor_pulse_meter_total
-      name: "${friendly_name} Total Consumption"
+      name: "Water Total Usage"
       icon: "mdi:cube-outline"
-      unit_of_measurement: "m³"
+      unit_of_measurement: "L"
       state_class: total_increasing
       device_class: water
-      accuracy_decimals: 3
-      filters:
-        - multiply: 0.001
+      accuracy_decimals: 0
+#      filters:
+#        - multiply: 0.001
+      
     pin: GPIO32
     on_value:
       then:
         - light.turn_on:
             id: light_led_green
             flash_length: 1s
+
+# Counting water usage with the Watermeterkit
+# https://community.home-assistant.io/t/counting-water-usage-with-the-watermeterkit/346167
+            
   #HDC1080 temp & hum sensor
   - platform: hdc1080
     temperature:
@@ -223,25 +246,18 @@ sensor:
 text_sensor:
   - platform: ethernet_info
     ip_address:
-      name: "${friendly_name} IP address"
+      name: "IP address"
       icon: "mdi:network-outline"
   - platform: version
     id: text_sensor_version
-    name: "${friendly_name} ESPHome Version"
-  - platform: template
-    id: text_sensor_waterp1meterkit_version
-    name: "${friendly_name} Software Version"
-    update_interval: 5h
-    lambda: |-
-      return {"${waterp1meterkit_software_version}"};
+    name: "ESPHome Version"
+    hide_timestamp: true
   - platform: dsmr
     identification:
-      name: ${friendly_name} Identification
+      name: Identification
     p1_version:
-      name: ${friendly_name} Version
+      name: Version
     timestamp:
       id: dsmr_timestamp
       internal: true
-    # Belgium
-    # p1_version_be:
-    #  name: ${friendly_name} Version BE
+
